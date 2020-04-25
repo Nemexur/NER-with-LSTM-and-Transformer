@@ -1,0 +1,11 @@
+# File extenstinos
+*.model
+*.vocab
+*.spm
+*_sp_dataset.txt
+# Directories
+*env/
+.vscode
+allentune
+__pycache__
+.ipynb_checkpoints
