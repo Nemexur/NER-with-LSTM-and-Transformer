@@ -1,4 +1,4 @@
-FROM python:3.6-stretch
+FROM python:3.6-stretch as builder
 
 ENV LANG C.UTF-8
 # Env for python
@@ -32,8 +32,6 @@ RUN apt-get update && \
     python3 -m venv venv && \
     . ./venv/bin/activate && \
     pip install --no-cache-dir -r requirements.txt
-# Copy allentune for HyperParameters Search
-RUN git clone https://github.com/allenai/allentune.git
 # Then copy everything else
 COPY . .
 # Define user to run docker container

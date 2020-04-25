@@ -17,7 +17,10 @@ def main(args: Namespace):
             f"Processing dataset at path: {dataset_path}",
             feautre='f-strings'
         )
-        encoded_dataset = process_dataset(at_path=dataset_path)
+        encoded_dataset = process_dataset(
+            at_path=dataset_path,
+            tagging_format=args.tagging_format
+        )
         save_path = f"{dataset_path}.spm"
         logger.success(
             f"Successfully processed dataset and started saving at path: {save_path}",
@@ -28,7 +31,10 @@ def main(args: Namespace):
         logger.success('Saved dataset')
 
 
-def process_dataset(at_path: str) -> str:
+def process_dataset(
+    at_path: str,
+    tagging_format: str
+) -> str:
     """
     Process dataset by encoding tokens with SentencePieceProcessor
     and respectively by adding new tags
@@ -37,6 +43,8 @@ def process_dataset(at_path: str) -> str:
     ----------
     at_path : `str`, required
         Path to the dataset in CoNLL-2003 format
+    tagging_format : `str`, required
+        Type of tagging in dataset.
 
     Returns
     -------
@@ -58,7 +66,8 @@ def process_dataset(at_path: str) -> str:
                 # Build new sample after encoding
                 sample = build_sentence_piece_tokens_and_tags(
                     tokens=tokens,
-                    tags=ner_tags
+                    tags=ner_tags,
+                    tagging_format=tagging_format
                 )
                 processed_dataset.append('\n'.join(sample))
     return '\n\n'.join(processed_dataset)
@@ -79,8 +88,11 @@ def is_divider_line(line: str) -> bool:
             return False
 
 
-def build_sentence_piece_tokens_and_tags(tokens: List[str],
-                                         tags: List[str]) -> List[str]:
+def build_sentence_piece_tokens_and_tags(
+    tokens: List[str],
+    tags: List[str],
+    tagging_format: str
+) -> List[str]:
     """
     Encode tokens with SentencePiece and also expand tags for NER based on encoding
 
@@ -90,6 +102,8 @@ def build_sentence_piece_tokens_and_tags(tokens: List[str],
         Tokens from sentence
     tags : `List[str]`, required
         List of tags for each token in sentence
+    tagging_format : `str`, required
+        Type of tagging in dataset.
 
     Returns
     -------
@@ -98,17 +112,36 @@ def build_sentence_piece_tokens_and_tags(tokens: List[str],
     """
     encoded_tokens = []
     tags_for_encoded_tokens = []
-    for token, tag in zip(tokens, tags):
+    for i, (token, tag) in enumerate(zip(tokens, tags)):
         encoded_token = SENTENCEPIECE_MODEL.EncodeAsPieces(str(token))
         encoded_tokens.extend([e_token for e_token in encoded_token])
         number_of_tags_to_append = len(encoded_token)
-        if tag.startswith('B-'):
-            number_of_tags_to_append -= 1
-            tags_for_encoded_tokens.append(tag)
-        tags_for_encoded_tokens.extend([
-            f'I-{tag[2:]}' if tag.startswith('B-') or tag.startswith('I-')
-            else 'O' for _ in range(number_of_tags_to_append)
-        ])
+        if tagging_format == 'BIO':
+            if tag.startswith('B-'):
+                number_of_tags_to_append -= 1
+                tags_for_encoded_tokens.append(tag)
+            tags_for_encoded_tokens.extend([
+                f'I-{tag[2:]}' if tag.startswith('B-') or tag.startswith('I-')
+                else 'O' for _ in range(number_of_tags_to_append)
+            ])
+        elif tagging_format == 'IOB':
+            if (
+                (tag.startswith('I-') and tags[i - 1][2:] != tag[2:])
+                or tag.startswith('B-')
+            ):
+                number_of_tags_to_append -= 1
+                tags_for_encoded_tokens.append(
+                    f'B-{tag[2:]}' if number_of_tags_to_append > 1 else f'I-{tag[2:]}'
+                )
+            tags_for_encoded_tokens.extend([
+                f'I-{tag[2:]}' if tag.startswith('B-') or tag.startswith('I-')
+                else 'O' for _ in range(number_of_tags_to_append)
+            ])
+        else:
+            raise ValueError(
+                'Invalid tagging_format. '
+                'Only BIO and IOB supported.'
+            )
     assert len(encoded_tokens) == len(tags_for_encoded_tokens), \
         "Number of tokens is not equal to number of tags"
     return [f"{word} {tag}" for word, tag in zip(encoded_tokens, tags_for_encoded_tokens)]
@@ -120,4 +153,6 @@ if __name__ == '__main__':
                         help="Paths to dataset for encoding. Ordinary these are train, test and valid datasets")
     parser.add_argument("--sentencepiece_model_path", help="Path to trained SentencePiece model",
                         required=True, type=str)
+    parser.add_argument("--tagging_format", required=True, type=str,
+                        help="Type of tagging that is used in the dataset. Only BIO and IOB are supported")
     main(args=parser.parse_args())
