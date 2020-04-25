@@ -1,0 +1,11 @@
+# File extensions
+*.model
+*.vocab
+*_sp_dataset.txt
+# Directories
+.git/
+.gitignore
+*env/
+.vscode
+__pycache__
+.ipynb_checkpoints
