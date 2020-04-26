@@ -4,9 +4,9 @@ import math
 import torch
 import torch.nn.functional as F
 
+from allennlp.nn import util
 from allennlp.modules.layer_norm import LayerNorm
 from allennlp.modules.seq2seq_encoders.seq2seq_encoder import Seq2SeqEncoder
-from allennlp.nn import util
 
 
 def subsequent_mask(size: int, device: str = 'cpu') -> torch.Tensor:
@@ -33,7 +33,8 @@ class PositionalEncodingTENER(torch.nn.Module):
         self,
         x: torch.Tensor
     ) -> torch.Tensor:
-        batch_size, timesteps = x.size()
+        _, timesteps = x.size()
+        # (2 * timesteps) x input_dim
         return self._get_pos_embeddings(2 * timesteps)
 
     def _get_pos_embeddings(self, timesteps: int):
@@ -150,7 +151,7 @@ class MultiHeadSelfAttentionTENER(torch.nn.Module):
         which are combined using the attention. Must be divisible by `num_heads`.
     dropout : `float`, optional (default = `0.1`).
         The dropout probability applied to the normalised attention
-        distributions.
+        distributions. If None, dropout probability is not applied.
     """
     def __init__(
         self,
@@ -170,7 +171,10 @@ class MultiHeadSelfAttentionTENER(torch.nn.Module):
         self._query_linear = torch.nn.Linear(input_dim, input_dim)
         self._value_linear = torch.nn.Linear(input_dim, values_dim)
         self._output_projection = torch.nn.Linear(values_dim, input_dim)
-        self._dropout = torch.nn.Dropout(p=dropout)
+        if dropout:
+            self._dropout = torch.nn.Dropout(p=dropout)
+        else:
+            self._dropout = lambda x: x
         # Biases
         self._v_bias = torch.nn.Parameter(
             torch.nn.init.xavier_normal_(torch.zeros(self._num_heads, self._attention_dim))
@@ -196,8 +200,8 @@ class MultiHeadSelfAttentionTENER(torch.nn.Module):
         value = self._value_linear(value).view(
             batch_size, -1, self._num_heads, self._values_dim // self._num_heads
         ).transpose(1, 2)
-        # 2) Make all elements in equation 18 (except u * relative, it is not needed)
-        # batch_size x num_heads x timesteps x timesteps
+        # 2) Make all elements in equation 18 (except u_bias * relative, it is not needed)
+        # query_key ~ batch_size x num_heads x timesteps x timesteps
         query_key = torch.einsum('bnqd,bnkd->bnqk', query, key)
         query_relative = torch.einsum('bnqd,ld->bnql', query, position_emb)
         v_bias_relative = torch.einsum('nd,ld->nl', self._v_bias, position_emb)[None, :, None]
@@ -205,29 +209,31 @@ class MultiHeadSelfAttentionTENER(torch.nn.Module):
         # 3) Shift last dimension
         query_rel_and_v_bias_rel = self._shift(query_rel_and_v_bias_rel)
         attn = query_key + query_rel_and_v_bias_rel
-        # 4) Masked softmax
-        x = self._masked_softmax(attn, value, batch_size=batch_size)
-        # 5) One more linear projection
+        # 4) Masked softmax for Attention
+        attn_softmax = self._masked_softmax(attn, mask)
+        # 5) Multiply Softmax(Attention) with value
+        x = torch.einsum('bnkq,bnqv->bknv', attn_softmax, value).reshape(batch_size, -1, self._values_dim)
+        # 6) One more linear projection
         return self._output_projection(x)
 
     def _masked_softmax(
         self,
         attn: torch.Tensor,
-        value: torch.Tensor,
-        batch_size: int,
-        should_scale: bool = False,
         mask: torch.Tensor = None,
-        dropout: Callable = None
+        should_scale: bool = False
     ) -> torch.Tensor:
+        """
+        Compute Softmax with mask and
+        perform additional attention scaling if needed.
+        """
         if should_scale:
             attn = attn / math.sqrt(self._attention_dim)
         if mask is not None:
             attn = attn.masked_fill(mask[:, None, None, :].eq(0), float('-inf'))
         attn = F.softmax(attn, dim=-1)
-        if dropout is not None:
-            attn = dropout(attn)
-        # Batch dot and transpose
-        return torch.einsum('bnkq,bnqv->bknv', attn, value).reshape(batch_size, -1, self._values_dim)
+        # Dropout after softmax
+        attn = self._dropout(attn)
+        return attn
 
     def _shift(self, tensor):
         """
@@ -239,7 +245,7 @@ class MultiHeadSelfAttentionTENER(torch.nn.Module):
         zero_pad = tensor.new_zeros(batch_size, num_heads, timesteps, 1)
         # tensor ~ batch_size x num_heads x (2 * timesteps + 1) x timesteps
         tensor = torch.cat([tensor, zero_pad], dim=-1).view(batch_size, num_heads, -1, timesteps)
-        # tensor ~ batch_size x num_heads x 2 * timesteps x timesteps
+        # tensor ~ batch_size x num_heads x timesteps x (2 * timesteps)
         tensor = tensor[:, :, :-1].view(batch_size, num_heads, timesteps, -1)
         tensor = tensor[:, :, :, timesteps:]
         return tensor
@@ -304,7 +310,6 @@ class TENER(Seq2SeqEncoder):
         super().__init__()
         self._transformer_layers = num_layers
         self._num_layers = num_layers
-        self._output_projection_dim = output_projection_dim or input_dim
         self._model = make_model(
             input_size=input_dim,
             hidden_size=hidden_dim,
@@ -313,10 +318,10 @@ class TENER(Seq2SeqEncoder):
             dropout=dropout
         )
         self._input_dim = input_dim
-        self._output_dim = input_dim
+        self._output_dim = output_projection_dim or input_dim
         self._output_projection = torch.nn.Linear(
             self._input_dim,
-            self._output_projection_dim
+            self._output_dim
         )
         if input_dropout:
             self._dropout = torch.nn.Dropout(input_dropout)
