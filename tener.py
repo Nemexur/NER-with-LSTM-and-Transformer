@@ -161,6 +161,8 @@ class MultiHeadSelfAttentionTENER(torch.nn.Module):
     ) -> None:
         super().__init__()
         assert input_dim % num_heads == 0, "input_dim must be a multiple of num_heads"
+        if values_dim:
+            assert values_dim % num_heads == 0, "values_dim must be a multiple of num_heads"
         self._input_dim = input_dim
         self._attention_dim = input_dim // num_heads
         self._num_heads = num_heads
@@ -173,6 +175,7 @@ class MultiHeadSelfAttentionTENER(torch.nn.Module):
         self._v_bias = torch.nn.Parameter(
             torch.nn.init.xavier_normal_(torch.zeros(self._num_heads, self._attention_dim))
         )
+        # Positional Encoding
         self._position = PositionalEncodingTENER(self._attention_dim)
 
     def forward(
@@ -194,9 +197,10 @@ class MultiHeadSelfAttentionTENER(torch.nn.Module):
             batch_size, -1, self._num_heads, self._values_dim // self._num_heads
         ).transpose(1, 2)
         # 2) Make all elements in equation 18 (except u * relative, it is not needed)
+        # batch_size x num_heads x timesteps x timesteps
         query_key = torch.einsum('bnqd,bnkd->bnqk', query, key)
-        v_bias_relative = torch.einsum('nd,ld->nl', self._v_bias, position_emb)[None, :, None]
         query_relative = torch.einsum('bnqd,ld->bnql', query, position_emb)
+        v_bias_relative = torch.einsum('nd,ld->nl', self._v_bias, position_emb)[None, :, None]
         query_rel_and_v_bias_rel = query_relative + v_bias_relative
         # 3) Shift last dimension
         query_rel_and_v_bias_rel = self._shift(query_rel_and_v_bias_rel)
@@ -222,7 +226,8 @@ class MultiHeadSelfAttentionTENER(torch.nn.Module):
         attn = F.softmax(attn, dim=-1)
         if dropout is not None:
             attn = dropout(attn)
-        return torch.matmul(attn, value).transpose(1, 2).reshape(batch_size, -1, self._values_dim)
+        # Batch dot and transpose
+        return torch.einsum('bnkq,bnqv->bknv', attn, value).reshape(batch_size, -1, self._values_dim)
 
     def _shift(self, tensor):
         """
