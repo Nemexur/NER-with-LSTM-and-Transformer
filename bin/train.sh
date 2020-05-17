@@ -9,7 +9,7 @@ rm -rf $MODELS_DIR/bilstm_model
 allennlp train $CONFIGS_DIR/bilstm_config.jsonnet -s $MODELS_DIR/bilstm_model --include-package $INCLUDE_PACKAGES
 # BiLSTM + Attention
 rm -rf $MODELS_DIR/bilstm_attn_model
-allennlp train $CONFIGS_DIR/bilstm_config.jsonnet -s $MODELS_DIR/bilstm_attn_model --include-package $INCLUDE_PACKAGES
+allennlp train $CONFIGS_DIR/bilstm_attention_config.jsonnet -s $MODELS_DIR/bilstm_attn_model --include-package $INCLUDE_PACKAGES
 # TENER
 rm -rf $MODELS_DIR/tener_model
 allennlp train $CONFIGS_DIR/tener_config.jsonnet -s $MODELS_DIR/tener_model --include-package $INCLUDE_PACKAGES
