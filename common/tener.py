@@ -48,6 +48,13 @@ class PositionalEncodingTENER(torch.nn.Module):
              torch.cos(position * div_term.unsqueeze(0))],
             dim=1
         ).view(timesteps, -1)
+        if self._input_size % 2 == 1:
+            # Zero pad as there are some problems
+            # when number of timesteps is not divisible by 2
+            positional_encoding = torch.cat(
+                [positional_encoding, torch.zeros(timesteps, 1)],
+                dim=1
+            )
         return positional_encoding
 
 
@@ -190,7 +197,7 @@ class MultiHeadSelfAttentionTENER(torch.nn.Module):
     ) -> torch.Tensor:
         batch_size = query.size(0)
         # 0) Relative positional encoding
-        position_emb = self._position(mask)
+        position_emb = self._position(mask).to(query.device)
         # 1) Do all the linear projections in batch from d_model => h x d_k
         key = key.view(batch_size, -1, self._num_heads, self._attention_dim).transpose(1, 2)
         query = self._query_linear(query).view(
@@ -313,6 +320,7 @@ class TENER(Seq2SeqEncoder):
             input_size=input_size,
             hidden_size=hidden_size,
             num_layers=num_layers,
+            heads=heads,
             values_size=values_size,
             dropout=dropout
         )
@@ -343,7 +351,7 @@ class TENER(Seq2SeqEncoder):
     def get_regularization_penalty(self):
         return 0.
 
-    def get_input_size(self) -> int:
+    def get_input_dim(self) -> int:
         return self._input_size
 
     def get_output_dim(self) -> int:

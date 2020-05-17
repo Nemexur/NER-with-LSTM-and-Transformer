@@ -64,6 +64,13 @@ local LSTM_ENCODER = {
   "bidirectional": true
 };
 
+//// Scheduler
+local SCHEDULER = {
+  "type": "exponential_from_epoch",
+  "gamma": 0.6,
+  "from_epoch": 2
+};
+
 {
   "dataset_reader": READER,
   "train_data_path": std.extVar("NER_TRAIN_DATA"),
@@ -96,11 +103,7 @@ local LSTM_ENCODER = {
       "type": "adam",
       "lr": 0.001
     },
-    "learning_rate_scheduler": {
-      "type": "exponential_from_epoch",
-      "gamma": 0.6,
-      "from_epoch": 2
-    },
+    "learning_rate_scheduler": if USE_SCHEDULER == "1" then SCHEDULER else null,
     "shuffle": true,
     "validation_metric": "+f1-measure-overall",
     "num_serialized_models_to_keep": 2,
@@ -109,6 +112,6 @@ local LSTM_ENCODER = {
     "patience": 2,
     "should_log_learning_rate": true,
     "should_log_parameter_statistics": true,
-    "cuda_device": 2
+    "cuda_device": 0
   }
 }

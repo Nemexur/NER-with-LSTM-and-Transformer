@@ -341,4 +341,4 @@ class SentenceTaggerPredictorNER(Predictor):
 ###################################################################################
 
 
-from .tener import *  # noqa: F401,F403
+from common.tener import *  # noqa: F401,F403

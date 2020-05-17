@@ -1,7 +1,8 @@
 local EMBEDDING_DIM = 100;
-local CHARS_NUM_FILTERS = 28;
+local CHARS_NUM_FILTERS = 32;
 local PRETRAINED_EMBEDDING_DIM = 100;
 local IS_CONLL_DATA = std.extVar("IS_CONLL_DATA");
+local USE_SCHEDULER = std.extVar("USE_SCHEDULER");
 local USE_PRETRAINED_EMBEDDINGS = std.extVar("USE_PRETRAINED_EMBEDDINGS");
 
 // Classes used in training
@@ -65,6 +66,13 @@ local TENER_ENCODER = {
   "output_projection_dim": 256
 };
 
+//// Scheduler
+local SCHEDULER = {
+  "type": "exponential_from_epoch",
+  "gamma": 0.6,
+  "from_epoch": 2
+};
+
 {
   "dataset_reader": READER,
   "train_data_path": std.extVar("NER_TRAIN_DATA"),
@@ -97,11 +105,7 @@ local TENER_ENCODER = {
       "type": "adam",
       "lr": 0.001
     },
-    "learning_rate_scheduler": {
-      "type": "exponential_from_epoch",
-      "gamma": 0.6,
-      "from_epoch": 2
-    },
+    "learning_rate_scheduler": if USE_SCHEDULER == "1" then SCHEDULER else null,
     "shuffle": true,
     "validation_metric": "+f1-measure-overall",
     "num_serialized_models_to_keep": 2,
@@ -110,6 +114,6 @@ local TENER_ENCODER = {
     "patience": 2,
     "should_log_learning_rate": true,
     "should_log_parameter_statistics": true,
-    "cuda_device": 2
+    "cuda_device": 0
   }
 }

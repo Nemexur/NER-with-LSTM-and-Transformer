@@ -1,6 +1,6 @@
 numpy
-torch
 pandas
 loguru
-allennlp
 sentencepiece
+torch==1.3.0
+allennlp==0.9.0

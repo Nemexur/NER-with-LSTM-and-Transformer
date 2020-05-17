@@ -9,6 +9,12 @@ ENV PYTHONUNBUFFERED=1
 ENV PATH="/venv/bin:$PATH"
 # Define working directory
 WORKDIR /home/app
+# Setup env variables for training
+ENV IS_CONLL_DATA=1
+ENV USE_SCHEDULER=0
+ENV USE_PRETRAINED_EMBEDDINGS=1
+ENV NER_TRAIN_DATA=/home/app/data/conll2003/conll2003.train
+ENV NER_TEST_DATA=/home/app/data/conll2003/conll2003.test
 # Install OS package dependencies.
 # Do all of this in one RUN to limit final image size.
 RUN apt-get update && \
@@ -35,5 +41,3 @@ RUN apt-get update && \
 COPY . .
 # Define user to run docker container
 USER app
-
-ENTRYPOINT ["./bin/train.sh"]
