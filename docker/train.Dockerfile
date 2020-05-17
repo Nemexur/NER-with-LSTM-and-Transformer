@@ -13,6 +13,7 @@ WORKDIR /home/app
 ENV IS_CONLL_DATA=1
 ENV USE_SCHEDULER=0
 ENV USE_PRETRAINED_EMBEDDINGS=1
+ENV PRETRAINED_EMBEDDINGS="https://allennlp.s3.amazonaws.com/datasets/glove/glove.6B.100d.txt.gz"
 ENV NER_TRAIN_DATA=/home/app/data/conll2003/conll2003.train
 ENV NER_TEST_DATA=/home/app/data/conll2003/conll2003.test
 # Install OS package dependencies.

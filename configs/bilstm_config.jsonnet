@@ -1,8 +1,9 @@
-local NUM_THREADS = 2;
+local EMBEDDING_DIM = 100;
 local CHARS_NUM_FILTERS = 32;
 local PRETRAINED_EMBEDDING_DIM = 100;
-local EMBEDDING_DIM = 100;
 local IS_CONLL_DATA = std.extVar("IS_CONLL_DATA");
+local USE_SCHEDULER = std.extVar("USE_SCHEDULER");
+local PRETRAINED_EMBEDDINGS = std.extVar("PRETRAINED_EMBEDDINGS");
 local USE_PRETRAINED_EMBEDDINGS = std.extVar("USE_PRETRAINED_EMBEDDINGS");
 
 // Classes used in training
@@ -36,7 +37,7 @@ local BUCKET_ITERATOR = {
 local PRETRAINED_TOKEN_EMBEDDER = {
   "type": "embedding",
   "embedding_dim": PRETRAINED_EMBEDDING_DIM,
-  "pretrained_file": "https://allennlp.s3.amazonaws.com/datasets/glove/glove.6B.100d.txt.gz",
+  "pretrained_file": PRETRAINED_EMBEDDINGS,
   "trainable": true
 };
 
