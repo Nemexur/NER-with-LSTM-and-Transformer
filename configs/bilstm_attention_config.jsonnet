@@ -110,7 +110,16 @@ local SCHEDULER = {
         }
       }
     },
-    "encoder": COMPOSE_ENCODER
+    "encoder": COMPOSE_ENCODER,
+    "regularizer": [
+      [
+        "scalar_parameters",
+        {
+          "type": "l2",
+          "alpha": 0.01
+        }
+      ]
+    ]
   },
   "iterator": BUCKET_ITERATOR,
   "trainer": {
