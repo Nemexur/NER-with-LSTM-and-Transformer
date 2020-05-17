@@ -22,24 +22,23 @@ class PositionalEncodingTENER(torch.nn.Module):
 
     Parameters
     ----------
-    input_dim : `int`, required
+    input_size : `int`, required
         Input dimension.
     """
-    def __init__(self, input_dim: int) -> None:
+    def __init__(self, input_size: int) -> None:
         super().__init__()
-        self._input_dim = input_dim
+        self._input_size = input_size
 
     def forward(
         self,
         x: torch.Tensor
     ) -> torch.Tensor:
         _, timesteps = x.size()
-        # (2 * timesteps) x input_dim
+        # (2 * timesteps) x input_size
         return self._get_pos_embeddings(2 * timesteps)
 
     def _get_pos_embeddings(self, timesteps: int):
-        half_dim = self._input_dim // 2
-        positional_encoding = torch.zeros(timesteps, self._input_dim, requires_grad=False)
+        half_dim = self._input_size // 2
         position = torch.arange(-timesteps // 2, timesteps // 2, dtype=torch.float).unsqueeze(1)
         div_term = torch.exp(
             torch.arange(half_dim, dtype=torch.float) * -(math.log(10000) / (half_dim - 1))
@@ -54,10 +53,10 @@ class PositionalEncodingTENER(torch.nn.Module):
 
 class PositionwiseFeedForward(torch.nn.Module):
     """Implements FFN equation."""
-    def __init__(self, input_dim: int, ff_dim: int, dropout: float = 0.1) -> None:
+    def __init__(self, input_size: int, ff_dim: int, dropout: float = 0.1) -> None:
         super().__init__()
-        self._w_1 = torch.nn.Linear(input_dim, ff_dim)
-        self._w_2 = torch.nn.Linear(ff_dim, input_dim)
+        self._w_1 = torch.nn.Linear(input_size, ff_dim)
+        self._w_2 = torch.nn.Linear(ff_dim, input_size)
         self._dropout = torch.nn.Dropout(dropout)
 
     def forward(
@@ -141,12 +140,12 @@ class MultiHeadSelfAttentionTENER(torch.nn.Module):
     ----------
     num_heads : `int`, required.
         The number of attention heads to use.
-    input_dim : `int`, required.
+    input_size : `int`, required.
         The size of the last dimension of the input tensor.
     attention_dim `int`, required.
         The total dimension of the query and key projections which comprise the
         dot product attention function. Must be divisible by `num_heads`.
-    values_dim : `int`, required.
+    values_size : `int`, required.
         The total dimension which the input is projected to for representing the values,
         which are combined using the attention. Must be divisible by `num_heads`.
     dropout : `float`, optional (default = `0.1`).
@@ -156,21 +155,21 @@ class MultiHeadSelfAttentionTENER(torch.nn.Module):
     def __init__(
         self,
         num_heads: int,
-        input_dim: int,
-        values_dim: int = None,
+        input_size: int,
+        values_size: int = None,
         dropout: float = 0.1
     ) -> None:
         super().__init__()
-        assert input_dim % num_heads == 0, "input_dim must be a multiple of num_heads"
-        if values_dim:
-            assert values_dim % num_heads == 0, "values_dim must be a multiple of num_heads"
-        self._input_dim = input_dim
-        self._attention_dim = input_dim // num_heads
+        assert input_size % num_heads == 0, "input_size must be a multiple of num_heads"
+        if values_size:
+            assert values_size % num_heads == 0, "values_size must be a multiple of num_heads"
+        self._input_size = input_size
+        self._attention_dim = input_size // num_heads
         self._num_heads = num_heads
-        self._values_dim = values_dim or input_dim
-        self._query_linear = torch.nn.Linear(input_dim, input_dim)
-        self._value_linear = torch.nn.Linear(input_dim, values_dim)
-        self._output_projection = torch.nn.Linear(values_dim, input_dim)
+        self._values_size = values_size or input_size
+        self._query_linear = torch.nn.Linear(input_size, input_size)
+        self._value_linear = torch.nn.Linear(input_size, values_size)
+        self._output_projection = torch.nn.Linear(values_size, input_size)
         if dropout:
             self._dropout = torch.nn.Dropout(p=dropout)
         else:
@@ -198,7 +197,7 @@ class MultiHeadSelfAttentionTENER(torch.nn.Module):
             batch_size, -1, self._num_heads, self._attention_dim
         ).transpose(1, 2)
         value = self._value_linear(value).view(
-            batch_size, -1, self._num_heads, self._values_dim // self._num_heads
+            batch_size, -1, self._num_heads, self._values_size // self._num_heads
         ).transpose(1, 2)
         # 2) Make all elements in equation 18 (except u_bias * relative, it is not needed)
         # query_key ~ batch_size x num_heads x timesteps x timesteps
@@ -212,7 +211,7 @@ class MultiHeadSelfAttentionTENER(torch.nn.Module):
         # 4) Masked softmax for Attention
         attn_softmax = self._masked_softmax(attn, mask)
         # 5) Multiply Softmax(Attention) with value
-        x = torch.einsum('bnkq,bnqv->bknv', attn_softmax, value).reshape(batch_size, -1, self._values_dim)
+        x = torch.einsum('bnkq,bnqv->bknv', attn_softmax, value).reshape(batch_size, -1, self._values_size)
         # 6) One more linear projection
         return self._output_projection(x)
 
@@ -256,12 +255,12 @@ def make_model(
     input_size: int = 512,  # Attention size
     hidden_size: int = 2048,  # FF layer size
     heads: int = 8,
-    values_dim: int = 256,
+    values_size: int = 256,
     dropout: float = 0.1
 ) -> TransformerEncoder:
     """`Helper`: Construct a model from hyperparameters."""
     attn = MultiHeadSelfAttentionTENER(
-        heads, input_size, values_dim, dropout
+        heads, input_size, values_size, dropout
     )
     ff = PositionwiseFeedForward(input_size, hidden_size, dropout)
     model = TransformerEncoder(
@@ -278,9 +277,9 @@ class TENER(Seq2SeqEncoder):
 
     Parameters
     ----------
-    input_dim : `int`, required
+    input_size : `int`, required
         The input dimension of the encoder.
-    hidden_dim : `int`, required
+    hidden_size : `int`, required
         The hidden dimension used for the _input_ to self-attention layers
         and the _output_ from the feedforward layers.
     heads : `int`, required
@@ -298,9 +297,9 @@ class TENER(Seq2SeqEncoder):
     """
     def __init__(
         self,
-        input_dim: int,
-        hidden_dim: int,
-        values_dim: int,
+        input_size: int,
+        hidden_size: int,
+        values_size: int,
         heads: int,
         num_layers: int,
         output_projection_dim: int = None,
@@ -311,16 +310,16 @@ class TENER(Seq2SeqEncoder):
         self._transformer_layers = num_layers
         self._num_layers = num_layers
         self._model = make_model(
-            input_size=input_dim,
-            hidden_size=hidden_dim,
+            input_size=input_size,
+            hidden_size=hidden_size,
             num_layers=num_layers,
-            values_dim=values_dim,
+            values_size=values_size,
             dropout=dropout
         )
-        self._input_dim = input_dim
-        self._output_dim = output_projection_dim or input_dim
+        self._input_size = input_size
+        self._output_dim = output_projection_dim or input_size
         self._output_projection = torch.nn.Linear(
-            self._input_dim,
+            self._input_size,
             self._output_dim
         )
         if input_dropout:
@@ -344,8 +343,8 @@ class TENER(Seq2SeqEncoder):
     def get_regularization_penalty(self):
         return 0.
 
-    def get_input_dim(self) -> int:
-        return self._input_dim
+    def get_input_size(self) -> int:
+        return self._input_size
 
     def get_output_dim(self) -> int:
         return self._output_dim

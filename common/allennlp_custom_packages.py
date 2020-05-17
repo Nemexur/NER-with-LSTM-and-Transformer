@@ -78,19 +78,23 @@ class Conll2003NERDatasetReader(Conll2003DatasetReader):
     label_namespace: ``str``, optional (default=``labels``)
         Specifies the namespace for the chosen ``tag_label``.
     """
-    def __init__(self,
-                 token_indexers: Dict[str, TokenIndexer] = None,
-                 tag_label: str = "ner",
-                 feature_labels: Sequence[str] = (),
-                 lazy: bool = False,
-                 coding_scheme: str = "IOB1",
-                 label_namespace: str = "labels") -> None:
-        super().__init__(token_indexers=token_indexers,
-                         tag_label=tag_label,
-                         feature_labels=feature_labels,
-                         coding_scheme=coding_scheme,
-                         label_namespace=label_namespace,
-                         lazy=lazy)
+    def __init__(
+        self,
+        token_indexers: Dict[str, TokenIndexer] = None,
+        tag_label: str = "ner",
+        feature_labels: Sequence[str] = (),
+        lazy: bool = False,
+        coding_scheme: str = "IOB1",
+        label_namespace: str = "labels"
+    ) -> None:
+        super().__init__(
+            token_indexers=token_indexers,
+            tag_label=tag_label,
+            feature_labels=feature_labels,
+            coding_scheme=coding_scheme,
+            label_namespace=label_namespace,
+            lazy=lazy
+        )
 
     @overrides
     def _read(self, file_path: str) -> Iterable[Instance]:
@@ -111,9 +115,11 @@ class Conll2003NERDatasetReader(Conll2003DatasetReader):
                     tokens = [Token(token) for token in tokens_]
                     yield self.text_to_instance(tokens, ner_tags)
 
-    def text_to_instance(self,
-                         tokens: List[Token],
-                         ner_tags: List[str] = None) -> Instance:
+    def text_to_instance(
+        self,
+        tokens: List[Token],
+        ner_tags: List[str] = None
+    ) -> Instance:
         """
         We take `pre-tokenized` input here, because we don't have a tokenizer in this class.
         """
@@ -260,11 +266,13 @@ class _PyTorchLearningRateSchedulerWithMetricsWrapper(_PyTorchLearningRateSchedu
 
 @LearningRateScheduler.register("exponential_from_epoch")
 class ExponentialLearningRateSchedulerFromEpoch(_PyTorchLearningRateSchedulerWrapper):
-    def __init__(self,
-                 optimizer: Optimizer,
-                 gamma: float = 0.1,
-                 from_epoch: int = 0,
-                 last_epoch: int = -1) -> None:
+    def __init__(
+        self,
+        optimizer: Optimizer,
+        gamma: float = 0.1,
+        from_epoch: int = 0,
+        last_epoch: int = -1
+    ) -> None:
         lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(
             optimizer=optimizer, gamma=gamma, last_epoch=last_epoch
         )
@@ -333,4 +341,4 @@ class SentenceTaggerPredictorNER(Predictor):
 ###################################################################################
 
 
-from tener import *  # noqa: F401,F403
+from .tener import *  # noqa: F401,F403

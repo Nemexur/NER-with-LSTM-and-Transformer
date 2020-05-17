@@ -22,9 +22,8 @@ COPY requirements.txt .
 # Define user to run models
 # and install dependencies
 RUN apt-get update && \
-    apt-get install git && \
-    apt-get install htop && \
-    apt-get install vim && \
+    apt-get install -y --no-install-recommends \
+        git htop vim && \
     # Delete apt-get cache
     rm -rf /var/lib/apt/lists/* && \
     adduser --system -u 1111 app && \
@@ -37,4 +36,4 @@ COPY . .
 # Define user to run docker container
 USER app
 
-CMD ["./train.sh"]
+ENTRYPOINT ["./bin/train.sh"]
