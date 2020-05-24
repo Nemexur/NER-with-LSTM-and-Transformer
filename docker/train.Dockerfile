@@ -1,3 +1,6 @@
+# If you need a GPU support you better
+# use an image with CUDA installed and
+# python3.6 support for virtaul environment
 FROM python:3.6-stretch as builder
 
 ENV LANG C.UTF-8
